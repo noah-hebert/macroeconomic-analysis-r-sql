@@ -30,3 +30,4 @@ ggplot2 visualization, and SQLite window functions.
 ## Files
 - `EDA_project.qmd` — full source code
 - `EDA_project.docx` — rendered report
+[https://public.tableau.com/views/EconomicIndicatorsDashboard20252026/EDAProject?:language=en-US&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link]
