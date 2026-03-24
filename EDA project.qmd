@@ -1,0 +1,279 @@
+---
+title: "Macroeconomic Trend Analysis"
+subtitle: "Inflation, Unemployment & GDP | R + SQL Pipeline"
+author: "Noah Hebert"
+date: 2026-03-04
+format:
+  html:
+    theme: flatly
+    toc: true
+    toc-title: "Contents"
+    toc-depth: 2
+    code-fold: true
+    df-print: kable
+    fig-width: 8
+    fig-height: 5
+  docx:
+    echo: false
+---
+
+## Project Overview
+
+This project builds a macroeconomic analysis pipeline using R and SQL to model an 11-month disinflation cycle (April 2025 – February 2026). A synthetic dataset was constructed to reflect plausible Federal Reserve policy responses — gradual rate reductions from 5.50% to 4.25% in response to declining inflation, with lagged effects on GDP growth, unemployment, and consumer sentiment.
+
+The workflow covers the full analysis lifecycle: data ingestion, tidyverse wrangling, ggplot2 visualization, and SQLite-based aggregation using window functions and conditional signal classification — replicating the kind of pipeline used in economic research and financial analysis roles.
+
+---
+
+## Setup
+
+```{r load-libraries}
+#| message: false
+#| warning: false
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(DBI)
+library(RSQLite)
+library(knitr)
+```
+
+---
+
+## Dataset
+
+The dataset models six macroeconomic indicators across 11 months. Variables were designed to reflect a realistic soft-landing scenario: inflation declining toward a 2% target while unemployment rises modestly and GDP decelerates.
+
+```{r load-data}
+#| message: false
+#| warning: false
+
+econ_data <- read_csv(I(
+"month,inflation_rate,unemployment_rate,gdp_growth,consumer_sentiment,interest_rate,retail_sales_growth
+2025-04,3.8,4.0,2.4,71,5.50,2.1
+2025-05,3.7,4.0,2.3,72,5.50,2.0
+2025-06,3.5,4.1,2.2,73,5.25,1.9
+2025-07,3.4,4.1,2.1,74,5.25,1.8
+2025-08,3.3,4.2,2.0,75,5.00,1.7
+2025-09,3.2,4.2,1.9,76,5.00,1.6
+2025-10,3.1,4.3,1.8,77,4.75,1.5
+2025-11,3.0,4.3,1.8,78,4.75,1.4
+2025-12,2.9,4.4,1.7,79,4.50,1.3
+2026-01,2.8,4.4,1.6,80,4.50,1.2
+2026-02,2.7,4.5,1.5,81,4.25,1.1"
+)) %>%
+  mutate(month = as.Date(paste0(month, "-01")))
+
+kable(econ_data, caption = "Table 1: Full Macroeconomic Dataset (Apr 2025 – Feb 2026)")
+```
+
+---
+
+## Visualizations
+
+### Inflation vs. Unemployment Rate
+
+Both series were reshaped to long format using `pivot_longer()` before plotting. The inverse relationship between disinflation and rising unemployment is consistent with the expectations-augmented Phillips Curve.
+
+```{r plot-inflation}
+#| fig-cap: "Figure 1: Inflation declined 1.1 pp as unemployment rose 0.5 pp — consistent with a soft-landing disinflation scenario."
+
+plot_data <- econ_data %>%
+  select(month, inflation_rate, unemployment_rate) %>%
+  pivot_longer(
+    cols = c(inflation_rate, unemployment_rate),
+    names_to = "metric",
+    values_to = "value"
+  )
+
+ggplot(plot_data, aes(x = month, y = value, color = metric)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2.5) +
+  scale_color_manual(
+    values = c("inflation_rate" = "#2980B9", "unemployment_rate" = "#E74C3C"),
+    labels = c("Inflation Rate", "Unemployment Rate")
+  ) +
+  scale_x_date(date_labels = "%b '%y", date_breaks = "2 months") +
+  labs(
+    title    = "Inflation vs. Unemployment Rate",
+    subtitle = "Apr 2025 – Feb 2026 | Synthetic Macroeconomic Dataset",
+    x = NULL, y = "Rate (%)", color = NULL,
+    caption  = "Source: Simulated dataset | Analysis: R / ggplot2"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+### GDP Growth vs. Retail Sales Growth
+
+A line chart comparing GDP growth against retail sales growth to assess whether consumer spending aligned with output deceleration. Retail sales contracted faster than GDP — signaling weakening demand ahead of output.
+
+```{r plot-gdp}
+#| fig-cap: "Figure 2: Retail sales contracted faster than GDP across the period, signaling demand weakness leading output deceleration."
+
+gdp_data <- econ_data %>%
+  select(month, gdp_growth, retail_sales_growth) %>%
+  pivot_longer(
+    cols = c(gdp_growth, retail_sales_growth),
+    names_to = "metric",
+    values_to = "value"
+  )
+
+ggplot(gdp_data, aes(x = month, y = value, color = metric)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2.5) +
+  scale_color_manual(
+    values = c("gdp_growth" = "#27AE60", "retail_sales_growth" = "#E67E22"),
+    labels = c("GDP Growth", "Retail Sales Growth")
+  ) +
+  scale_x_date(date_labels = "%b '%y", date_breaks = "2 months") +
+  labs(
+    title    = "GDP Growth vs. Retail Sales Growth",
+    subtitle = "Apr 2025 – Feb 2026 | Synthetic Macroeconomic Dataset",
+    x = NULL, y = "Percent (%)", color = NULL,
+    caption  = "Source: Simulated dataset | Analysis: R / ggplot2"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+---
+
+## SQL Analysis
+
+The dataset was loaded into an in-memory SQLite database via the `DBI` and `RSQLite` packages. Months are stored as character strings (`YYYY-MM-DD`) to avoid SQLite's Unix day-integer conversion, which would otherwise render dates as raw integers in query output.
+
+```{r sql-setup}
+#| message: false
+
+con <- dbConnect(RSQLite::SQLite(), ":memory:")
+
+dbWriteTable(
+  con,
+  "economic_indicators",
+  econ_data %>% mutate(month = as.character(month)),
+  overwrite = TRUE
+)
+```
+
+### Query 1 — 3-Month Rolling Averages
+
+`AVG() OVER (ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)` computes a trailing 3-month average for inflation and unemployment, smoothing short-term noise to reveal the underlying trend direction.
+
+```{r sql-rolling-avg}
+rolling_avg <- dbGetQuery(con, "
+SELECT
+  month,
+  inflation_rate,
+  ROUND(AVG(inflation_rate) OVER (
+    ORDER BY month
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+  ), 3) AS inflation_3m_avg,
+  unemployment_rate,
+  ROUND(AVG(unemployment_rate) OVER (
+    ORDER BY month
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+  ), 3) AS unemployment_3m_avg
+FROM economic_indicators
+")
+
+kable(rolling_avg, caption = "Table 2: 3-Month Rolling Averages — Inflation & Unemployment")
+```
+
+### Query 2 — Macro Signal Classification
+
+A `CASE WHEN` statement classifies each month into one of three macro regimes based on GDP, retail sales, inflation, and interest rate thresholds — mirroring rule-based signal labeling used in economic policy dashboards.
+
+```{r sql-macro-signal}
+macro_signal <- dbGetQuery(con, "
+SELECT
+  month,
+  inflation_rate,
+  interest_rate,
+  gdp_growth,
+  retail_sales_growth,
+  CASE
+    WHEN gdp_growth < 1.8 AND retail_sales_growth < 1.3 THEN 'Demand Softening'
+    WHEN inflation_rate > 3.5 AND interest_rate > 5.0   THEN 'High Inflation / Tight Policy'
+    ELSE 'Stable'
+  END AS macro_signal
+FROM economic_indicators
+")
+
+kable(macro_signal, caption = "Table 3: Macro Regime Classification by Month")
+```
+
+### Query 3 — Month-over-Month Change
+
+`LAG()` computes period-over-period deltas for inflation, unemployment, and GDP — quantifying the pace and direction of change across all key indicators.
+
+```{r sql-mom-change}
+mom_change <- dbGetQuery(con, "
+SELECT
+  month,
+  inflation_rate,
+  ROUND(inflation_rate - LAG(inflation_rate) OVER (ORDER BY month), 2) AS inflation_change,
+  unemployment_rate,
+  ROUND(unemployment_rate - LAG(unemployment_rate) OVER (ORDER BY month), 2) AS unemployment_change,
+  gdp_growth,
+  ROUND(gdp_growth - LAG(gdp_growth) OVER (ORDER BY month), 2) AS gdp_change
+FROM economic_indicators
+")
+
+kable(mom_change, caption = "Table 4: Month-over-Month Change — Key Indicators")
+```
+
+### Query 4 — Pearson Correlation (Inflation vs. Unemployment)
+
+Manual computation of the Pearson correlation coefficient between inflation and unemployment directly in SQL — no R post-processing required. A negative result confirms the inverse Phillips Curve relationship present in the data.
+
+```{r sql-correlation}
+corr_result <- dbGetQuery(con, "
+SELECT
+  ROUND(
+    (AVG(inflation_rate * unemployment_rate) - AVG(inflation_rate) * AVG(unemployment_rate))
+    /
+    (SQRT(AVG(inflation_rate * inflation_rate) - AVG(inflation_rate) * AVG(inflation_rate))
+     * SQRT(AVG(unemployment_rate * unemployment_rate) - AVG(unemployment_rate) * AVG(unemployment_rate))),
+  4) AS pearson_corr_infl_unemp
+FROM economic_indicators
+")
+
+kable(corr_result, caption = "Table 5: Pearson Correlation — Inflation vs. Unemployment")
+```
+
+```{r sql-disconnect}
+#| include: false
+
+dbDisconnect(con)
+```
+
+---
+
+## Key Findings
+
+```{r findings}
+#| echo: false
+
+infl_change  <- round(tail(econ_data$inflation_rate, 1)    - econ_data$inflation_rate[1],    2)
+unemp_change <- round(tail(econ_data$unemployment_rate, 1) - econ_data$unemployment_rate[1], 2)
+gdp_change   <- round(tail(econ_data$gdp_growth, 1)        - econ_data$gdp_growth[1],        2)
+rate_cuts    <- (econ_data$interest_rate[1] - tail(econ_data$interest_rate, 1)) * 100
+pearson      <- corr_result$pearson_corr_infl_unemp
+```
+
+| Metric | Change | Interpretation |
+|---|---|---|
+| Inflation | `r infl_change` pp | Sustained disinflation toward 2% target |
+| Unemployment | +`r unemp_change` pp | Modest labor market softening; soft-landing dynamic |
+| GDP Growth | `r gdp_change` pp | Steady deceleration; demand-side weakness in final months |
+| Rate Cuts Modeled | `r rate_cuts` bps | 5 cuts of 25 bps across the easing cycle |
+| Infl/Unemp Correlation | `r pearson` | Negative — Phillips Curve relationship confirmed |
+
+**Soft-landing signal:** Inflation fell meaningfully while unemployment rose only modestly (+0.5 pp), consistent with a controlled disinflation scenario rather than a recession-driven correction. The final two months were classified as *Demand Softening* by the SQL signal logic, suggesting the economy was approaching — but had not yet entered — a contractionary phase.
+
+---
+
+*Built with R · ggplot2 · dplyr · SQLite · Quarto*
