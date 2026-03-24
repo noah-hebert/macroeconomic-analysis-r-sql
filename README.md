@@ -1,3 +1,4 @@
+## 📊 [View Full Report](https://noah-hebert.github.io/macroeconomic-analysis-r-sql/EDA%20project.html)
 # macroeconomic-analysis-r-sql
 # Macroeconomic Trend Analysis | R + SQL
 
