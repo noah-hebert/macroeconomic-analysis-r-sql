@@ -1,15 +1,20 @@
 ## 📊 [View Full Report](https://noah-hebert.github.io/macroeconomic-analysis-r-sql/EDA%20project.html)
-# macroeconomic-analysis-r-sql
-# Macroeconomic Trend Analysis | R + SQL
+## 📈 [View Interactive Tableau Dashboard](https://public.tableau.com/views/EconomicIndicatorsDashboard20252026/EDAProject)
 
-**Tools:** R · ggplot2 · dplyr · SQLite · Quarto  
+# Macroeconomic Trend Analysis | R + SQL + Tableau
+
+**Tools:** R · ggplot2 · dplyr · SQLite · Quarto · Tableau  
 **Period:** April 2025 – February 2026  
+
+---
 
 ## Overview
 Built a macroeconomic analysis pipeline to model an 11-month 
 disinflation cycle. Analyzed inflation, unemployment, GDP growth, 
 interest rates, and consumer sentiment using tidyverse wrangling, 
-ggplot2 visualization, and SQLite window functions.
+ggplot2 visualization, SQL window functions, and Tableau dashboards.
+
+---
 
 ## Key Results
 | Metric | Change |
@@ -20,14 +25,30 @@ ggplot2 visualization, and SQLite window functions.
 | Rate Cuts Modeled | 125 bps |
 | Inflation/Unemployment Correlation | −0.9851 |
 
+---
+
+## Tableau Dashboard
+Developed an interactive Tableau dashboard to visualize macroeconomic trends and highlight key relationships between indicators.
+
+**Features:**
+- Dual-axis comparison of inflation and unemployment  
+- Time-series analysis of GDP growth and interest rates  
+- Reference lines and bands for performance benchmarking  
+- Annotated insights highlighting economic relationships  
+
+[View Dashboard on Tableau Public](https://public.tableau.com/views/EconomicIndicatorsDashboard20252026/EDAProject)
+
+---
+
 ## Techniques Used
-- tidyr `pivot_longer()` for multi-series visualization prep
+- `tidyr::pivot_longer()` for multi-series visualization prep
 - SQL window functions: `AVG() OVER`, `LAG() OVER`
 - `CASE WHEN` macro regime classification
 - Pearson correlation computed natively in SQL
 - Quarto for reproducible report rendering
 
+---
+
 ## Files
-- `EDA_project.qmd` — full source code
-- `EDA_project.docx` — rendered report
-[https://public.tableau.com/views/EconomicIndicatorsDashboard20252026/EDAProject?:language=en-US&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link]
+- `EDA_project.qmd` — full source code  
+- `EDA_project.docx` — rendered report  
